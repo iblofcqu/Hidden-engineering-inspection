@@ -95,7 +95,7 @@ class PointCloudRegistration:
         # 相机坐标系 -> 框架坐标系转换
         angle_x = [self.txt_rot[i][0] for i in range(self.row_txt_rot)]
         angle_y = [-(self.txt_rot[i][1] + 180) for i in range(self.row_txt_rot)]
-        displacement = np.array([[167.915, 94.1067, 56.2], [0, 84.9424, 0]])
+        displacement = np.array([[167.915, 94.1067, 56.2], [0, 84.9424, 0]])#初始标定数据要根据实际设备安装情况进行改变
         points_calibra = copy.deepcopy(self.points)
 
         for i in range(self.row_txt_rot):
