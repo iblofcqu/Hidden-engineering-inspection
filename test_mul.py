@@ -59,15 +59,33 @@ class PointCloudRegistration:
             points[i] = np.transpose(a)
         return points
 
+    def estimate_pairwise_threshold(pcd1, pcd2, multiplier=2.0):
+        """根据两个点云的平均最近邻距离计算自适应 threshold。"""
+        dists1 = pcd1.compute_nearest_neighbor_distance()
+        dists2 = pcd2.compute_nearest_neighbor_distance()
+        avg_dist1 = np.mean(dists1)
+        avg_dist2 = np.mean(dists2)
+        avg_pair_dist = (avg_dist1 + avg_dist2) / 2
+        return avg_pair_dist * multiplier
+
     @staticmethod
     def draw_registration_result(src, tar, transformation, save_path=None):
-        source_temp = copy.deepcopy(src)
         target_temp = copy.deepcopy(tar)
-        source_temp.transform(transformation)
+        target_temp.transform(transformation)
         if save_path:
-            o3d.io.write_point_cloud(save_path, source_temp)
-        o3d.visualization.draw_geometries([source_temp, target_temp],
-                                          window_name="GICP配准结果", width=800, height=600)
+            o3d.io.write_point_cloud(save_path, target_temp)
+        # o3d.visualization.draw_geometries([source_temp, target_temp],
+        #                                   window_name="GICP配准结果", width=800, height=600)
+        #此段代码为显示两两精确配准结果，可不必显示
+
+    def estimate_pairwise_threshold(self, pcd1, pcd2, multiplier=2.0):
+        """根据两个点云的平均最近邻距离计算自适应 threshold。"""
+        dists1 = pcd1.compute_nearest_neighbor_distance()
+        dists2 = pcd2.compute_nearest_neighbor_distance()
+        avg_dist1 = np.mean(dists1)
+        avg_dist2 = np.mean(dists2)
+        avg_pair_dist = (avg_dist1 + avg_dist2) / 2
+        return avg_pair_dist * multiplier
 
     def run(self):
         Start_time = time.time()
@@ -81,6 +99,7 @@ class PointCloudRegistration:
         angle_x = [self.txt_rot[i][0] for i in range(self.row_txt_rot)]
         angle_y = [-(self.txt_rot[i][1] + 180) for i in range(self.row_txt_rot)]
         displacement = np.array([[167.915, 94.1067, 56.2], [0, 84.9424, 0]])  # 需根据实际设备安装情况调整
+        #后续需要增加相邻两帧数据间的标定数据
         points_calibra = copy.deepcopy(self.points)
 
         for i in range(self.row_txt_rot):
@@ -108,33 +127,77 @@ class PointCloudRegistration:
 
         # ---------------- GICP 精配准 ----------------
         print("开始执行 Generalized ICP 两两精配准")
+        transform_accumulated = np.eye(4)
+
+        # Step 1: 保存第 1 帧为基准帧（无变换）
+        first_frame = o3d.io.read_point_cloud(os.path.join(self.save_folder_path, "1.ply"))
+        first_save_path = os.path.join(self.icp_save_path, "trans_of_1.ply")
+        o3d.io.write_point_cloud(first_save_path, first_frame)
+
+        initial_threshold = 2
+        threshold_step = 1
+
         for i in range(self.row_txt_dis):
-            source_path = os.path.join(self.save_folder_path, f"{i+1}.ply")
-            target_path = os.path.join(self.save_folder_path, f"{i+2}.ply")
+            # source 从前一步的配准结果中读取
+            source_path = os.path.join(self.icp_save_path, f"trans_of_{i + 1}.ply")
+            # target 从原始数据中读取
+            target_path = os.path.join(self.save_folder_path, f"{i + 2}.ply")
 
             source_raw = o3d.io.read_point_cloud(source_path)
             target_raw = o3d.io.read_point_cloud(target_path)
 
-            source = source_raw.voxel_down_sample(voxel_size=1)
-            target = target_raw.voxel_down_sample(voxel_size=1)
+            # 下采样
+            source = source_raw.voxel_down_sample(voxel_size=0.2)
+            target = target_raw.voxel_down_sample(voxel_size=0.2)
+
+            # 设置动态阈值,目前还是根据设备经验选择
+            threshold_mot = initial_threshold + i * threshold_step
+            # ⬅️ 自动计算 threshold（核心集成点）
+            threshold = self.estimate_pairwise_threshold(source, target, multiplier=threshold_mot)#初始值差距过大的话，multiplier要选大一点
+            print(f"[Pair {i + 1}-{i + 2}] 采用 threshold={threshold:.3f} 进行精配准")
 
             trans_init = np.eye(4)
-            threshold = 5.0
 
             evaluation = o3d.pipelines.registration.evaluate_registration(source, target, threshold, trans_init)
-            print(f"[Pair {i+1}-{i+2}] 初始 fitness: {evaluation.fitness:.4f}, RMSE: {evaluation.inlier_rmse:.4f}")
+            print(
+                f"[Pair {i + 1}-{i + 2}] threshold={threshold} 初始 fitness: {evaluation.fitness:.4f}, RMSE: {evaluation.inlier_rmse:.4f}")
 
             result = o3d.pipelines.registration.registration_generalized_icp(
                 source, target, threshold, trans_init,
                 o3d.pipelines.registration.TransformationEstimationForGeneralizedICP(),
                 o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=100))
 
-            print(f"[Pair {i+1}-{i+2}] GICP fitness: {result.fitness:.4f}, RMSE: {result.inlier_rmse:.4f}")
+            print(f"[Pair {i + 1}-{i + 2}] GICP fitness: {result.fitness:.4f}, RMSE: {result.inlier_rmse:.4f}")
             print("Transformation:\n", result.transformation)
 
-            save_trans_path = os.path.join(self.icp_save_path, f"trans_of_{i+1}.ply")
-            self.draw_registration_result(source_raw, target_raw, result.transformation, save_path=save_trans_path)
+            # 应用变换到 target_raw
+            target_transformed = copy.deepcopy(target_raw)
+            target_transformed.transform(transform_accumulated)
 
+            save_trans_path = os.path.join(self.icp_save_path, f"trans_of_{i + 2}.ply")
+            o3d.io.write_point_cloud(save_trans_path, target_transformed)
+
+        print("所有 GICP 精配准后的点云已保存。")
+        # ---------------- 合并点云 ----------------
+        print("开始融合所有 GICP 精配准后的点云")
+
+        merged_pcd = o3d.io.read_point_cloud(os.path.join(self.icp_save_path, "trans_of_1.ply"))
+
+        for i in range(2, self.row_txt_dis + 2):  # 注意这里 +2 是因为有 N+1 帧
+            trans_path = os.path.join(self.icp_save_path, f"trans_of_{i - 1}.ply")
+            if os.path.exists(trans_path):
+                pcd = o3d.io.read_point_cloud(trans_path)
+                merged_pcd += pcd
+            else:
+                print(f"[警告] 找不到 {trans_path}，跳过该帧")
+
+        # 保存最终融合点云
+        merged_path = os.path.join("merged.ply")
+        o3d.io.write_point_cloud(merged_path, merged_pcd)
+        print("最终融合点云已保存到：", merged_path)
+
+        # 可视化融合结果
+        o3d.visualization.draw_geometries([merged_pcd], window_name="融合拼接结果", width=960, height=720)
         End_time = time.time()
         print("全部完成，用时 %.3fs" % (End_time - Start_time))
 
