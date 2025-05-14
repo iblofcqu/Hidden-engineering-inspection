@@ -13,11 +13,17 @@ def merge_points_files(files_paths: list[str], result_path: str) -> bool:
     由形参传入
 
     Args:
+        files_paths (list[str])"./转角.txt",
+        files_paths (list[str])"./平移量.txt",这两个数据可能是固定的，所以也可能直接写在底层函数上
         files_paths (list[str]):  传入多个点云文件的路径,如 ['1.txt','2.txt']
-        result_path (str): 存放合并后的点云文件的路径,如 'result.txt'
-
+        save_folder_path (list[str]):传入粗配准点云的路径,如 ['coarse_1.txt','coarse_2.txt']
+        icp_save_path (list[str]):传入精确配准点云的路径,如 ['accuracy_1.txt','accuracy_2.txt']
+        savehe icp这两个文件夹也可以一起，分开主要是为了清晰保存
     Returns:
         bool: 执行结果, true 表示正确执行完毕,false 表示失败.
+        xx.ply or xx.txt 整体点云数据
+
+    ps:可能每次扫描的数据都需要一个单独的文件夹，
     """
     ...
 
