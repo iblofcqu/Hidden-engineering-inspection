@@ -61,8 +61,9 @@ def split_points(
 
 class SuperParameters(TypedDict):
     """
-    1、计算模具长宽及两对角线长度，及对角线差
-    2、计算门窗长宽、对角线长度和对角线差
+    定义检测指标
+    1、计算模具长宽及两对角线长度，及对角线长度
+    2、计算门窗长宽、对角线长度和对角线长度
     3、预埋钢板水平位置（X/Y）及垂直位置（Z）
     4、插筋锚固长度，水平位置（X）及垂直位置（Z）
     5、波纹管长度，水平位置（X）及垂直位置（Z）
@@ -71,6 +72,7 @@ class SuperParameters(TypedDict):
 
     水平位置主要是计算四个边，取最近的两条边作为（X/Y）位置
     垂直位置（Z）计算到保温板平面的距离
+    ps：需开发以上七个计算函数
     """
 
     ...
@@ -79,6 +81,13 @@ class SuperParameters(TypedDict):
 class QualityResult(TypedDict):
     """
     定义检测结果
+    1、计算模具长宽差及两对角线长度差，及对角线差
+    2、计算门窗长宽差、对角线长度差和对角线差
+    3、预埋钢板水平位置（X/Y）差及垂直位置（Z）差
+    4、插筋锚固长度差，水平位置（X）差及垂直位置（Z）差
+    5、波纹管长度差，水平位置（X）差及垂直位置（Z）差
+    6、吊钉垂直位置（Z）差
+    7、线盒水平位置(X/Y)差
     """
 
     ...
@@ -93,15 +102,33 @@ def make_quality(
     质量检测API
     质量检测分以下几步
     1、计算模具长宽及两对角线长度，及对角线差
-    2、计算门窗长宽、对角线长度和对角线差
-
-    Args:
-        points_splited (str): 分割后的构件A 的点云文件路径
-        points_cloud (str): 从云端获取的构件A 的点云文件路径
-        super_para (SuperParameters): 从云端获取的检测项B,在检测期间需要提供的超参,由算法提要求
+      Args:
+        points_splited (str): 整体模具的的点云数据，可以尝试直通滤波，直接考虑切片z轴某个范围内的点云
+        super_para (SuperParameters): SuperParameters计算出的指标，从云端获取的标准值,相减得到差值
 
     Returns:
-        QualityResult: 与检测项B 对应的, 检测结果. 返回结果内容应至少包含UI中需要展示的检测项.
+        QualityResult: 检测结果. 返回结果内容应至少包含UI中需要展示的检测项.
+
+    2、计算门窗长宽、对角线长度和对角线差
+    Args:
+        points_splited (str): 分割后的门窗点云数据
+        super_para (SuperParameters): SuperParameters计算出的指标，从云端获取的标准值,相减得到差值
+
+    Returns:
+        QualityResult: 检测结果. 返回结果内容应至少包含UI中需要展示的检测项.
+
+    3、预埋钢板水平位置（X/Y）差及垂直位置（Z）差
+    4、插筋锚固长度差，水平位置（X）差及垂直位置（Z）差
+    5、波纹管长度差，水平位置（X）差及垂直位置（Z）差
+    6、吊钉垂直位置（Z）差
+    7、线盒水平位置(X/Y)差
+    Args:
+        points_splited (str): 切片出来的模具边缘点云
+        points_cloud (str): 对应的每个预埋件点云（每种预埋件都有单独的点云，且各计算一次）
+        super_para (SuperParameters): SuperParameters计算出的指标，从云端获取的标准值,相减得到差值
+
+    Returns:
+        QualityResult: 检测结果. 返回结果内容应至少包含UI中需要展示的检测项.
     """
     pass
 
