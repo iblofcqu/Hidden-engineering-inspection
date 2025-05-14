@@ -59,14 +59,17 @@ class PointCloudRegistration:
             points[i] = np.transpose(a)
         return points
 
-    def estimate_pairwise_threshold(pcd1, pcd2, multiplier=2.0):
+    def estimate_pairwise_threshold(self, pcd1, pcd2, multiplier=2.0):
         """根据两个点云的平均最近邻距离计算自适应 threshold。"""
-        dists1 = pcd1.compute_nearest_neighbor_distance()
-        dists2 = pcd2.compute_nearest_neighbor_distance()
-        avg_dist1 = np.mean(dists1)
-        avg_dist2 = np.mean(dists2)
-        avg_pair_dist = (avg_dist1 + avg_dist2) / 2
-        return avg_pair_dist * multiplier
+        '''两种计算点云距离的方法'''
+        # dists1 = pcd1.compute_nearest_neighbor_distance()
+        # dists2 = pcd2.compute_nearest_neighbor_distance()
+        # avg_dist1 = np.mean(dists1)
+        # avg_dist2 = np.mean(dists2)
+        # avg_pair_dist = (avg_dist1 + avg_dist2) / 2
+        # return avg_pair_dist * multiplier
+        distance = pcd1.compute_point_cloud_distance(pcd2)
+        return distance
 
     @staticmethod
     def draw_registration_result(src, tar, transformation, save_path=None):
